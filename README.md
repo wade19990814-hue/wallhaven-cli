@@ -145,7 +145,7 @@ This keeps the public surface at 6 commands, the test suite small, and lets agen
 
 ## Responsible use
 
-Respect Wallhaven's API rules, rate limits, copyright, and the rights of each wallpaper's creator. Do not use search results as a training corpus or a bulk commercial asset library. The CLI retries HTTP 429 twice after a two-second wait; callers must still avoid concurrent calls and large page sweeps.
+Respect Wallhaven's API rules, rate limits, copyright, and the rights of each wallpaper's creator. Do not use search results as a training corpus or a bulk commercial asset library. The CLI retries HTTP 429 and transient network errors up to twice after a two-second wait; callers must still avoid concurrent calls and large page sweeps.
 
 ## License
 
