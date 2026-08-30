@@ -39,7 +39,7 @@ wallhaven tag <numeric-id>                                 # View tag metadata b
 ### Backing up a collection
 
 - Pass `--purity 111` when enumerating a collection for backup. The default `--purity 100` silently drops sketchy/NSFW items **and shrinks pagination itself** (e.g. 396 items → 199, 17 pages → 9): same page numbers map to different content under different purity filters.
-- When `--id` is given without `--user`, the CLI reads `WALLHAVEN_USERNAME` (env var; Windows falls back to the user registry entry). If neither exists, ask the user for their username once.
+- When `--id` is given without `--user`, the CLI reads `WALLHAVEN_USERNAME` (env var; Windows falls back to the user registry entry). If neither exists, the CLI exits with code 2. In that case: ask the user for their username, then pass it as `--user <name>` for this session. If the user wants this resolved permanently, suggest setting the variable once (`setx WALLHAVEN_USERNAME <name>` on Windows, or the shell profile on macOS/Linux) so future sessions skip the question.
 - Paginate with `--page` up to `meta.last_page`, then de-duplicate by wallpaper id. Cross-page duplicates and total-count drift are intermittent on Wallhaven's side: reconcile by id, never by `meta.total`.
 - Incremental backup: enumerate ids, compare against existing local `wallhaven-<id>.*` files, download only the difference. `download` skips existing files unless `--force`.
 
