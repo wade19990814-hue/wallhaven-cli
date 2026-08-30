@@ -1,0 +1,18 @@
+# Python bytecode and test output
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.coverage
+htmlcov/
+
+# Local downloads and interrupted writes
+artifacts/
+*.part
+
+# Credentials and local tooling
+.env
+.venv/
+venv/
+.vscode/
