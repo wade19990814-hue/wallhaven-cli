@@ -75,6 +75,12 @@ export WALLHAVEN_API_KEY='your-key'
 
 On Windows, the CLI falls back to the user environment entry at `HKCU\Environment\WALLHAVEN_API_KEY` when a non-login shell did not inherit it. The key is sent only in the `X-API-Key` header, never in an API URL.
 
+Similarly, `collections --id <id>` (browsing items of a specific collection) needs your Wallhaven username in the API path. Pass `--user <name>`, or set `WALLHAVEN_USERNAME` once and the CLI resolves it automatically:
+
+```powershell
+setx WALLHAVEN_USERNAME "your-wallhaven-username"
+```
+
 ## Optional agent skill
 
 The [`skills/wallhaven`](skills/wallhaven/) directory is a separate Agent Skill artifact. It contains workflow and safety guidance only; it requires `wallhaven` CLI version `>=0.2.0,<0.3.0` on `PATH`.

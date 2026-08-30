@@ -15,6 +15,7 @@ from . import __version__
 
 API = "https://wallhaven.cc/api/v1"
 KEY_ENV = "WALLHAVEN_API_KEY"
+USER_ENV = "WALLHAVEN_USERNAME"
 VERSION = __version__
 USER_AGENT = f"wallhaven-cli/{VERSION}"
 
@@ -70,6 +71,18 @@ def _api_key():
         return ""
 
 
+def _username():
+    user = os.environ.get(USER_ENV, "").strip()
+    if user or sys.platform != "win32":
+        return user
+    import winreg
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as handle:
+            return str(winreg.QueryValueEx(handle, USER_ENV)[0]).strip()
+    except OSError:
+        return ""
+
+
 def _request(url, timeout=30, want="json"):
     for attempt in range(3):
         _throttle()
@@ -106,6 +119,9 @@ def _request(url, timeout=30, want="json"):
                 raise CliError("Not found on Wallhaven.", 4, status=404, url=url) from exc
             raise CliError(f"Wallhaven API returned HTTP {exc.code}.", 4, status=exc.code, url=url) from exc
         except urllib.error.URLError as exc:
+            if attempt < 2:
+                time.sleep(2)
+                continue
             raise CliError(f"Network error talking to wallhaven.cc: {exc.reason}", 5) from exc
 
 
@@ -173,10 +189,16 @@ def cmd_tag(args):
 def cmd_collections(args):
     user = args.user.strip() if args.user else ""
     cid = args.id.strip() if args.id else ""
-    purity = args.purity
+    if cid and not user:
+        user = _username()
 
     if cid and not user:
-        raise CliError("Querying collection items by --id requires --user <username>.", 2)
+        raise CliError(
+            f"Querying collection items by --id needs a username: pass --user <name> or set {USER_ENV}.",
+            2,
+            hint=f"Set {USER_ENV} once (e.g. setx {USER_ENV} your-username) so future sessions resolve it automatically.",
+        )
+    purity = args.purity
 
     if not TRIPLE_RE.match(purity):
         raise CliError("purity must be a 3-char binary string like 100 or 111.", 2)

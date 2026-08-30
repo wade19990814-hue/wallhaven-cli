@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+import urllib.error
 from unittest import mock
 
 
@@ -194,6 +195,38 @@ class WallhavenCliTests(unittest.TestCase):
             self.assertEqual(result["collection_id"], 123)
             self.assertEqual(len(result["items"]), 1)
             self.assertEqual(result["items"][0]["id"], "wq37kp")
+
+    def test_collections_id_uses_username_env(self):
+        fake_items = {
+            "data": [],
+            "meta": {"current_page": 1, "last_page": 1, "total": 0},
+        }
+        with mock.patch.object(wallhaven, "_request", return_value=fake_items) as req, \
+                mock.patch.dict(wallhaven.os.environ, {"WALLHAVEN_USERNAME": "tester"}, clear=False):
+            code, result = self.run_subcommand(["collections", "--id", "123"])
+            self.assertEqual(code, 0)
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["user"], "tester")
+            self.assertIn("/collections/tester/123", req.call_args[0][0])
+
+    def test_request_retries_transient_network_error(self):
+        responses = [
+            urllib.error.URLError("SSL: UNEXPECTED_EOF_WHILE_READING"),
+            FakeResponse(json.dumps({"data": {"id": "wq37kp"}}).encode(), "application/json"),
+        ]
+        calls = {"n": 0}
+
+        def fake_urlopen(req, timeout=30):
+            if calls["n"] == 0:
+                calls["n"] += 1
+                raise responses[0]
+            return responses[1]
+
+        with mock.patch.object(wallhaven.time, "sleep") as fake_sleep, \
+                mock.patch.object(wallhaven.urllib.request, "urlopen", side_effect=fake_urlopen):
+            payload = wallhaven._request("https://wallhaven.cc/api/v1/w/wq37kp")
+            self.assertEqual(payload["data"]["id"], "wq37kp")
+            fake_sleep.assert_called()
 
 
 if __name__ == "__main__":
