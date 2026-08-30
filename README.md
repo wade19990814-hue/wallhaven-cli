@@ -20,14 +20,14 @@ It is a standalone CLI first. The repository also ships an optional agent skill 
 
 ## Install the CLI
 
-Python 3.9 or newer is required. Clone or download this repository, then install the CLI from the repository root:
+Python 3.9 or newer is required. Install directly from PyPI:
 
 ```bash
-python -m pip install .
+pip install wallhaven-cli
 wallhaven --version
 ```
 
-For development, use an editable install instead:
+Or install from a local clone for development:
 
 ```bash
 python -m pip install -e .

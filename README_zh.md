@@ -20,14 +20,14 @@
 
 ## 安装 CLI
 
-需要 Python 3.9 或更高版本。克隆本仓库并在仓库根目录下执行安装：
+需要 Python 3.9 或更高版本。直接通过 PyPI 安装：
 
 ```bash
-python -m pip install .
+pip install wallhaven-cli
 wallhaven --version
 ```
 
-开发调试时推荐使用可编辑安装（Editable install）：
+或从本地源码进行开发安装（Editable install）：
 
 ```bash
 python -m pip install -e .
