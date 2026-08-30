@@ -50,11 +50,20 @@ Existing target files are returned as `skipped: true`; pass `--force` only when 
 | By an uploader | `--q "@username"` |
 | Exact tag id | `--q "id:123"` (do not combine with other terms) |
 
-Search operators: prefix `+` requires a tag, `-` excludes it, and plain space-separated terms are OR-ed. `type:png` or `type:jpg` filters by file format. Combine freely: `--q "+tokyo -people type:png"`.
+Search operators: `+tag` requires an exact tag; a bare word matches fuzzily (including tag aliases, so it returns more); `-tag` excludes. Multiple terms are AND-ed together. `type:png` or `type:jpg` filters by file format. Combine freely: `--q "+tokyo -people type:png"`.
 
 Tag names and numeric tag ids are different things. Search terms like `+cyberpunk` use tag names; the `tag` subcommand and `--q "id:123"` use numeric ids. They are not interchangeable.
 
 Treat `wallhaven.cc/w/<id>` and `whvn.cc/<id>` as `get` inputs, not search terms. For empty results, relax `--atleast` or `--ratios` first, then reduce required `+tags`; do not enable NSFW merely to obtain more results.
+
+## Search strategy
+
+1. Quality first: sort by `--sorting favorites` or `--sorting toplist --top-range 1M` when the user wants good wallpapers. Default `relevance` is text relevance, not quality.
+2. Start wide, then narrow. Each additional `+tag` shrinks results fast (e.g. +tokyo 1149 → +tokyo +night 2K anime 7). Add filters one at a time and check `meta.total` between steps.
+3. Tags have aliases. A bare fuzzy word matches aliases too (`anime girl` finds more than `+anime girls`); prefer bare words when unsure of the canonical tag name. To learn a wallpaper's actual tags, run `get` on it and read `tags`.
+4. `like:<id>` finds wallpapers sharing tags with the given one (typically a few dozen results) — good for "more like this one", not as a primary search.
+5. `--colors` accepts one of ~30 fixed hex values, comma-combined as OR. Use it to describe a palette range, not an exact shade.
+6. When results are plentiful but generic, narrow by `--ratios`/`--atleast` plus one more `+tag`; when results are empty, remove `+tags` before lowering resolution.
 
 ## Reading result fields
 
