@@ -1,5 +1,7 @@
 # wallhaven-cli
 
+English | [简体中文](README_zh.md)
+
 `wallhaven-cli` is a dependency-free, JSON-first command-line client for searching, inspecting, and downloading wallpapers through the [Wallhaven API](https://wallhaven.cc/help/api).
 
 It is a standalone CLI first. The repository also ships an optional agent skill under [`skills/wallhaven`](skills/wallhaven/) that teaches skill-aware agents how to call the installed command safely; the CLI never depends on that skill.
