@@ -2,10 +2,13 @@
 """Wallhaven CLI: search / get / download, stable JSON on stdout."""
 
 import argparse
+import http.client
 import json
 import os
 import re
+import ssl
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -83,16 +86,45 @@ def _username():
         return ""
 
 
+def _is_api_url(url):
+    parsed = urllib.parse.urlsplit(url)
+    return (
+        parsed.scheme == "https"
+        and parsed.hostname == "wallhaven.cc"
+        and parsed.port in (None, 443)
+        and parsed.username is None
+        and parsed.password is None
+        and parsed.path.startswith("/api/v1/")
+    )
+
+
+class _SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        error = None
+        if urllib.parse.urlsplit(newurl).scheme != "https":
+            error = "Refusing a redirect to a non-HTTPS URL."
+        elif req.has_header("X-api-key") and not _is_api_url(newurl):
+            error = "Refusing to forward the API key outside the Wallhaven API."
+        if error:
+            if fp is not None:
+                fp.close()
+            raise CliError(error, 4)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_opener = urllib.request.build_opener(_SafeRedirectHandler())
+
+
 def _request(url, timeout=30, want="json"):
     for attempt in range(3):
         _throttle()
         headers = {"User-Agent": USER_AGENT}
-        key = _api_key() if url.startswith(API) else ""
+        key = _api_key() if _is_api_url(url) else ""
         if key:
             headers["X-API-Key"] = key
         req = urllib.request.Request(url, headers=headers)
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
+            with _opener.open(req, timeout=timeout) as resp:
                 body = resp.read()
                 ctype = resp.headers.get_content_type()
             if want == "image":
@@ -106,6 +138,7 @@ def _request(url, timeout=30, want="json"):
             except (UnicodeDecodeError, json.JSONDecodeError) as exc:
                 raise CliError("Wallhaven API returned malformed JSON.", 4, url=url) from exc
         except urllib.error.HTTPError as exc:
+            exc.close()
             if exc.code == 429 and attempt < 2:
                 time.sleep(2)
                 continue
@@ -118,11 +151,13 @@ def _request(url, timeout=30, want="json"):
             if exc.code == 404:
                 raise CliError("Not found on Wallhaven.", 4, status=404, url=url) from exc
             raise CliError(f"Wallhaven API returned HTTP {exc.code}.", 4, status=exc.code, url=url) from exc
-        except urllib.error.URLError as exc:
-            if attempt < 2:
+        except (urllib.error.URLError, TimeoutError, ConnectionError,
+                ssl.SSLError, http.client.IncompleteRead) as exc:
+            reason = exc.reason if isinstance(exc, urllib.error.URLError) else exc
+            if attempt < 2 and not isinstance(reason, ssl.SSLCertVerificationError):
                 time.sleep(2)
                 continue
-            raise CliError(f"Network error talking to wallhaven.cc: {exc.reason}", 5) from exc
+            raise CliError(f"Network error talking to Wallhaven: {reason}", 5) from exc
 
 
 def _slim(data):
@@ -356,6 +391,9 @@ def cmd_download(args):
     remote = data.get("path")
     if not remote:
         raise CliError("Wallpaper detail has no original image path.", 4)
+    expected = data.get("file_size")
+    if type(expected) is not int or expected <= 0:
+        raise CliError("Wallpaper detail has no valid file size; cannot verify the download.", 4)
     outdir = os.path.abspath(args.out)
     try:
         os.makedirs(outdir, exist_ok=True)
@@ -363,19 +401,33 @@ def cmd_download(args):
         raise CliError("Could not create the output directory.", 4, path=outdir) from exc
     target = os.path.join(outdir, os.path.basename(urllib.parse.urlsplit(remote).path))
     if os.path.exists(target) and not args.force:
+        try:
+            valid = os.path.isfile(target) and os.path.getsize(target) == expected
+        except OSError as exc:
+            raise CliError("Could not inspect the existing download.", 4, path=target) from exc
+        if not valid:
+            raise CliError("Existing target does not match the expected file size.", 4,
+                           path=target, hint="Use --force to replace it with a verified download.")
         _emit({"ok": True, "command": "download", "item": _slim(data),
-               "file": {"path": target, "bytes": os.path.getsize(target), "skipped": True}})
+               "file": {"path": target, "bytes": expected, "skipped": True}})
     body = _request(remote, timeout=120, want="image")
-    partial = target + ".part"
+    if len(body) != expected:
+        raise CliError("Download size does not match Wallhaven metadata.", 4,
+                       expected_bytes=expected, actual_bytes=len(body))
+    partial = None
     try:
-        with open(partial, "wb") as handle:
+        with tempfile.NamedTemporaryFile(
+            dir=outdir, prefix=os.path.basename(target) + ".", suffix=".part", delete=False
+        ) as handle:
+            partial = handle.name
             handle.write(body)
         os.replace(partial, target)
     except OSError as exc:
-        try:
-            os.remove(partial)
-        except OSError:
-            pass
+        if partial is not None:
+            try:
+                os.remove(partial)
+            except OSError:
+                pass
         raise CliError("Could not save the download.", 4, path=target) from exc
     _emit({"ok": True, "command": "download", "item": _slim(data),
            "file": {"path": target, "bytes": len(body)}})
@@ -432,7 +484,7 @@ def build_parser():
 
     c = sub.add_parser("collections", help="list collections or browse items in a collection")
     c.add_argument("--user", default=None, help="username (omitted = own collections, requires key)")
-    c.add_argument("--id", default=None, help="collection id (requires --user)")
+    c.add_argument("--id", default=None, help="collection id (requires --user or WALLHAVEN_USERNAME)")
     c.add_argument("--purity", default="100", help="sfw/sketchy/nsfw as 1/0 triplet (needs key if not 100)")
     c.add_argument("--page", type=int, default=1)
     c.set_defaults(func=cmd_collections)

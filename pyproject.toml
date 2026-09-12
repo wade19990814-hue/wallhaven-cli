@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -25,6 +25,10 @@ dependencies = []
 
 [project.scripts]
 wallhaven = "wallhaven_cli.cli:main"
+
+[project.urls]
+Repository = "https://github.com/wade19990814-hue/wallhaven-cli"
+Issues = "https://github.com/wade19990814-hue/wallhaven-cli/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]

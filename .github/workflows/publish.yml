@@ -8,28 +8,79 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: pypi-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    name: Validate tag and build distributions
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Require a version-matching tag
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name || github.ref_name }}
+        run: |
+          python - <<'PY'
+          import os
+          import sys
+          sys.path.insert(0, "src")
+          from wallhaven_cli import __version__
+          expected = "v" + __version__
+          if os.environ["GITHUB_REF"] != "refs/tags/" + expected or os.environ["RELEASE_TAG"] != expected:
+              raise SystemExit(f"Publish from the {expected} tag, not a branch or a mismatched tag.")
+          PY
+
+      - name: Build and check distributions
+        run: |
+          python -m pip install --upgrade build twine
+          python -m build
+          python -m twine check --strict dist/*
+
+      - name: Check source archive and installed wheel
+        run: |
+          python -m pip install --no-deps dist/*.whl
+          python - <<'PY'
+          import importlib.metadata
+          import json
+          from pathlib import Path
+          import subprocess
+          import tarfile
+          with tarfile.open(next(Path("dist").glob("*.tar.gz"))) as archive:
+              names = {name.split("/", 1)[-1] for name in archive.getnames()}
+          required = {"README.md", "README_zh.md", "skills/wallhaven/SKILL.md", "LICENSE"}
+          assert required <= names, f"Missing from source archive: {required - names}"
+          version = importlib.metadata.version("wallhaven-cli")
+          assert subprocess.check_output(["wallhaven", "--version"], text=True).strip() == "wallhaven " + version
+          result = subprocess.run(["wallhaven", "search", "--page", "invalid"], capture_output=True, text=True)
+          assert result.returncode == 2 and json.loads(result.stdout)["ok"] is False
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+          if-no-files-found: error
+
   pypi-publish:
-    name: Build and publish to PyPI
+    name: Publish verified distributions to PyPI
+    needs: build
     runs-on: ubuntu-latest
     permissions:
       id-token: write
-      contents: read
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/download-artifact@v4
         with:
-          python-version: "3.11"
-
-      - name: Install build tool
-        run: python -m pip install --upgrade build
-
-      - name: Build distributions
-        run: python -m build
-
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+          name: distributions
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
 
