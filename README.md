@@ -20,20 +20,32 @@ It is a standalone CLI first. The repository also ships an optional agent skill 
 
 ## Install the CLI
 
-Python 3.9 or newer is required. Install directly from PyPI:
+Python 3.9 or newer is required. This project is distributed through GitHub source and build artifacts; new versions are not published to PyPI.
+
+### Install from source
+
+Clone this repository, or [download the current source ZIP](https://github.com/wade19990814-hue/wallhaven-cli/archive/refs/heads/main.zip) and extract it. Open a terminal in the directory containing `pyproject.toml`:
 
 ```bash
-pip install wallhaven-cli
+git clone https://github.com/wade19990814-hue/wallhaven-cli.git
+cd wallhaven-cli
+python -m venv .venv
+```
+
+Activate the environment with `source .venv/bin/activate` on macOS/Linux or `.venv\Scripts\Activate.ps1` in Windows PowerShell, then install:
+
+```bash
+python -m pip install .
 wallhaven --version
 ```
 
-Or install from a local clone for development:
+The ZIP download replaces the `git clone` step; enter the extracted directory instead. For an editable development install, use `python -m pip install -e .` in the same environment. The CLI has no runtime dependencies; pip installs the build tools needed to build it from source.
 
-```bash
-python -m pip install -e .
-```
+### GitHub downloads
 
-The project has no runtime dependencies. Development installation requires a clone or an extracted source archive.
+The current `main` source is version `0.2.1`. The older [v0.2.0 Release](https://github.com/wade19990814-hue/wallhaven-cli/releases/tag/v0.2.0) has no attached wheel or executable and does not satisfy the bundled Skill's `>=0.2.1` requirement. Use the current source above for the current CLI and Skill.
+
+The [distribution workflow](https://github.com/wade19990814-hue/wallhaven-cli/actions/workflows/package.yml) produces a `distributions` artifact containing a wheel and source archive after a successful build from `main`, a manually selected ref, or a Release tag. Download and extract that artifact when available, then install the wheel with `python -m pip install --force-reinstall <path-to-downloaded-wheel.whl>` or extract the source archive and follow the source-install steps above. Check the run's commit or tag and `wallhaven --version` against the version you need. Actions artifacts require a GitHub sign-in and may expire; the source-install route remains available. The workflow does not attach files to Releases or publish to PyPI.
 
 ## Quick start
 
@@ -97,7 +109,7 @@ The [`skills/wallhaven`](skills/wallhaven/) directory is a separate Agent Skill 
 
 Install in this order:
 
-1. Install the CLI and verify `wallhaven --version` succeeds.
+1. Install the CLI and verify `wallhaven --version` succeeds in the environment used by your agent. If you used a virtual environment, activate it before launching the agent so the command is on its `PATH`.
 2. Get the complete `skills/wallhaven/` directory from this repository or the matching source distribution, then copy it into the skill location used by your agent host. Installing the CLI wheel with pip does not install the skill.
 3. Do not copy `src/` into the skill or replace the command with raw HTTP requests.
 
@@ -119,20 +131,28 @@ wallhaven search --q "+tokyo +night" --ratios 16x9 --sorting favorites
 
 The GitHub Actions workflow installs the package before running the unit suite and command smoke test on Windows and Ubuntu with Python 3.9 and 3.13.
 
-Before publishing a release:
+Before distributing a build:
 
 1. Run the unit suite and a live SFW smoke search through the installed command.
 2. Install the package into a clean environment and verify `wallhaven --version`, JSON error output, and one download.
 3. Update the skill's CLI version range if the command-line or JSON contract changed, and re-validate the skill.
 4. Confirm no local paths, API keys, or downloaded images are staged.
 
-### Publishing (maintainers)
+### Packaging (maintainers)
 
-The publish workflow runs the Windows/Linux test matrix, requires a tag matching the package version (`v<version>`), builds the source archive and wheel, and checks their contents and installation before uploading to PyPI. Manual runs must also select that tag, not `main`.
+Build locally from a verified checkout:
 
-PyPI Trusted Publishing must be configured on the package separately: GitHub owner `wade19990814-hue`, repository `wallhaven-cli`, workflow `publish.yml`, and no environment name (the workflow currently uses none). The workflow uses a short-lived identity token, not a stored PyPI API token. Local installation or a locally stored token does not configure Trusted Publishing.
+```bash
+python -m pip install --upgrade build twine
+python -m build
+python -m twine check --strict dist/*
+```
 
-Commit and push the verified source, create the matching tag, then publish its GitHub Release to trigger the workflow. Confirm that the workflow succeeded and the version is available on PyPI; a tag or GitHub Release alone is not proof of a successful package upload. Do not move published version tags or reuse a version for different package contents.
+The source archive and wheel are written to `dist/`. The source archive includes both READMEs and the optional Skill; the wheel installs only the CLI. Test an install in a fresh virtual environment before sharing either file.
+
+The `package.yml` workflow runs automatically for source or packaging configuration changes on `main`, and can also be run manually from the Actions page. Documentation-only changes do not trigger it. It runs the existing Windows/Linux test matrix, builds the source archive and wheel, and checks their contents and installation. No release or version tag is needed for branch builds. It uploads only the `distributions` Actions artifact. It has read-only repository permissions, needs no publishing credentials, and has no PyPI publishing job.
+
+Download the `distributions` artifact from a successful **Build distribution artifacts** run and keep its commit reference when sharing a development build. If a tagged build is desired later, its tag must match the package version (`v<version>`); publishing a GitHub Release also triggers that validation. A Release by itself does not provide a wheel, and this workflow does not upload Release assets. Do not move published version tags or reuse a released version for different package contents.
 
 ## Architecture
 

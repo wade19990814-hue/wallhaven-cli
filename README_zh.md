@@ -20,18 +20,32 @@
 
 ## 安装 CLI
 
-需要 Python 3.9 或更高版本。直接通过 PyPI 安装：
+需要 Python 3.9 或更高版本。项目通过 GitHub 源码和构建产物分发，不再向 PyPI 发布新版本。
+
+### 从源码安装
+
+克隆本仓库，或[下载当前源码 ZIP](https://github.com/wade19990814-hue/wallhaven-cli/archive/refs/heads/main.zip) 并解压。在包含 `pyproject.toml` 的目录中打开终端：
 
 ```bash
-pip install wallhaven-cli
+git clone https://github.com/wade19990814-hue/wallhaven-cli.git
+cd wallhaven-cli
+python -m venv .venv
+```
+
+macOS/Linux 执行 `source .venv/bin/activate`，Windows PowerShell 执行 `.venv\Scripts\Activate.ps1` 激活虚拟环境，然后安装：
+
+```bash
+python -m pip install .
 wallhaven --version
 ```
 
-或从本地源码进行开发安装（Editable install）：
+下载 ZIP 时无需执行 `git clone`，直接进入解压目录即可。开发时可在同一环境中改用 `python -m pip install -e .` 进行可编辑安装。CLI 没有运行时第三方依赖；pip 会安装从源码构建所需的构建工具。
 
-```bash
-python -m pip install -e .
-```
+### 从 GitHub 下载
+
+当前 `main` 源码版本为 `0.2.1`。旧的 [v0.2.0 Release](https://github.com/wade19990814-hue/wallhaven-cli/releases/tag/v0.2.0) 没有附加 wheel 或可执行文件，也不满足随仓库提供的 Skill 所要求的 `>=0.2.1`。需要当前 CLI 和 Skill 时，请使用上面的当前源码安装方式。
+
+[分发包工作流](https://github.com/wade19990814-hue/wallhaven-cli/actions/workflows/package.yml) 在 `main`、手动选择的 ref 或 Release 标签构建成功后生成名为 `distributions` 的 artifact，其中包含 wheel 和源码包。存在成功产物时，可下载并解压，再用 `python -m pip install --force-reinstall <下载的-wheel-文件路径.whl>` 安装 wheel，或解压源码包后按上面的源码步骤安装。请核对运行所用提交或标签，并通过 `wallhaven --version` 确认版本。下载 Actions artifact 需要登录 GitHub，且产物可能过期；仍可使用源码安装。工作流不会自动把文件附加到 Release，也不会发布到 PyPI。
 
 ## 快速上手
 
@@ -93,7 +107,7 @@ setx WALLHAVEN_USERNAME "你的用户名"
 
 **安装顺序**：
 
-1. 先安装 CLI，确认 `wallhaven --version` 在终端中执行成功；
+1. 先安装 CLI，确认 `wallhaven --version` 在 Agent 使用的环境中执行成功；若使用虚拟环境，请先激活它再启动 Agent，确保命令在其 `PATH` 中；
 2. 从本仓库或对应版本的源码分发包中获取完整的 `skills/wallhaven/` 目录，复制到 Agent 所读取的 Skill 路径下；pip 安装 CLI wheel 不会自动安装 Skill；
 3. 不要将 `src/` 拷贝进 Skill，也不要用裸 HTTP 请求替代 CLI 调用。
 
@@ -115,20 +129,28 @@ wallhaven search --q "+tokyo +night" --ratios 16x9 --sorting favorites
 
 GitHub Actions CI 流水线会在 Windows 和 Ubuntu（Python 3.9 与 3.13）环境下先安装包再执行完整测试与冒烟验证。
 
-**发布前检查清单**：
+**分发前检查清单**：
 
 1. 运行离线单测套件并在已安装环境中执行 SFW 实时搜索；
 2. 在全新虚拟环境中安装包，验证 `wallhaven --version`、JSON 参数错误输出和单张图片下载；
 3. 若 CLI 的命令行参数或 JSON 契约发生变动，同步更新 Skill 中的版本约束并重新运行验证；
 4. 确认未暂存任何本地绝对路径、真实 API Key 或下载的壁纸文件。
 
-### 发布（维护者）
+### 打包（维护者）
 
-发布流程会先运行 Windows/Linux 测试矩阵，核对标签与包版本是否一致（`v<版本号>`），再构建源码包和 wheel，检查包内容及安装结果，最后上传 PyPI。手动运行也必须选择对应版本标签，不能从 `main` 直接发布。
+在验证过的源码目录中执行：
 
-需要单独在 PyPI 项目中配置 Trusted Publishing：GitHub owner 为 `wade19990814-hue`，仓库为 `wallhaven-cli`，工作流文件为 `publish.yml`，环境名称留空（当前工作流未使用 environment）。工作流使用短期身份令牌，不读取本机保存的 PyPI API token；本地能上传不代表 Trusted Publishing 已经配置好。
+```bash
+python -m pip install --upgrade build twine
+python -m build
+python -m twine check --strict dist/*
+```
 
-提交并推送验证过的源码、创建对应版本标签，再发布该标签的 GitHub Release，便会触发流程。确认流程成功且 PyPI 上出现相应版本后，才算完成包发布。不要移动已发布的版本标签，也不要让同一版本号对应不同的包内容。
+源码包和 wheel 会生成在 `dist/` 下。源码包包含中英文 README 和可选 Skill；wheel 只安装 CLI。分发前请在全新虚拟环境中验证安装结果。
+
+`package.yml` 工作流会在 `main` 的源码或打包配置变更时自动运行，也可从 Actions 页面手动运行；仅文档变更不会触发。工作流先运行现有 Windows/Linux 测试矩阵，再构建源码包和 wheel，并检查包内容及安装结果。分支构建无需创建 Release 或版本标签。最终只上传 `distributions` Actions artifact。工作流仅使用仓库只读权限，无需发布凭据，也没有 PyPI 发布任务。
+
+从成功的 **Build distribution artifacts** 运行中下载 `distributions` artifact，分享开发构建时保留对应提交信息。以后若需要标签构建，标签必须与包版本一致（`v<版本号>`）；发布 GitHub Release 也会触发该校验。仅有 Release 不代表提供了 wheel，此工作流不会上传 Release 附件。不要移动已发布的版本标签，也不要让同一已发布版本号对应不同的包内容。
 
 ## 架构与设计原则
 
@@ -169,4 +191,3 @@ CLI 提供可组合的基础操作。组合已有操作就能实现的功能（�
 ## 开源协议
 
 [MIT](LICENSE)。
-

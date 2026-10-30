@@ -8,6 +8,8 @@ description: >-
 
 Use the installed `wallhaven` CLI (`>=0.2.1,<0.3.0`); this skill is not a second HTTP client. Check `wallhaven --version` before the first operation in a session. If unavailable or incompatible, ask the user to install or update it rather than substituting raw API calls or scraping.
 
+Install or update the CLI from [this repository's current source](https://github.com/wade19990814-hue/wallhaven-cli#install-the-cli), or a verified GitHub build artifact with a compatible version. From a clone or extracted source directory containing `pyproject.toml`, install into a virtual environment with `python -m pip install .`, then check `wallhaven --version` in the agent host's environment (it must inherit the virtual environment's `PATH`). Do not recommend `pip install wallhaven-cli` from PyPI: new versions are distributed through GitHub only. The historical v0.2.0 Release is too old for this Skill. Copy the complete `skills/wallhaven/` directory from matching source separately; installing a wheel does not install the Skill.
+
 Command results and errors are JSON; `--help` and `--version` are plain text. Check both the exit code and `ok` before using a result. A failed page is not an empty page.
 
 ## Scope and account settings
