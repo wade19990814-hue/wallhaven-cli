@@ -17,6 +17,13 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         python-version: ["3.9", "3.13"]
+        exclude:
+          - os: ubuntu-latest
+            python-version: "3.9"
+        include:
+          # Python 3.9 binaries are not available for the latest Ubuntu image.
+          - os: ubuntu-22.04
+            python-version: "3.9"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

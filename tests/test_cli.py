@@ -341,7 +341,7 @@ class WallhavenCliTests(unittest.TestCase):
 
     def test_http_errors_keep_exit_contract(self):
         for status, expected_code, attempts in ((401, 3, 1), (404, 4, 1), (429, 4, 3), (500, 4, 1)):
-            error = urllib.error.HTTPError(wallhaven.API + "/search", status, "HTTP error", {}, None)
+            error = urllib.error.HTTPError(wallhaven.API + "/search", status, "HTTP error", {}, io.BytesIO(b""))
             with self.subTest(status=status), mock.patch.object(wallhaven.time, "sleep") as sleep, \
                     mock.patch.object(wallhaven._opener, "open", side_effect=error) as request:
                 code, result = self.run_main(["search"])
@@ -351,7 +351,7 @@ class WallhavenCliTests(unittest.TestCase):
                 self.assertEqual(sleep.call_count, attempts - 1)
 
     def test_http_429_can_recover(self):
-        error = urllib.error.HTTPError(wallhaven.API + "/search", 429, "rate limit", {}, None)
+        error = urllib.error.HTTPError(wallhaven.API + "/search", 429, "rate limit", {}, io.BytesIO(b""))
         with mock.patch.object(wallhaven.time, "sleep") as sleep, \
                 mock.patch.object(wallhaven._opener, "open", side_effect=[error, FakeResponse(b'{}')]):
             self.assertEqual(wallhaven._request(wallhaven.API + "/search"), {})
